@@ -19,7 +19,7 @@
   }
   body{ display:grid; place-items:center; }
 
-  /* ====== 等比縮放容器（關鍵） ====== */
+  /* ====== 等比縮放容器（以 720×720 為基準） ====== */
   #fitBox{
     width:min(92vw, 760px);
     height:min(92vw, 760px);
@@ -64,7 +64,7 @@
     background:radial-gradient(circle at 35% 35%, #fff,#e5e5e5);
     display:grid; place-items:center; color:#444; font-weight:700;
     box-shadow:0 1px 2px rgba(0,0,0,.2), inset 0 4px 8px rgba(0,0,0,.15);
-    user-select:none;
+    user-select:none; cursor:pointer;
   }
   .chip.s{ left:auto; right: calc(50% - 170px); }
 
@@ -99,32 +99,16 @@
   }
   .brandStack .name{ font-weight:700; letter-spacing:.20em; font-size:16px; }
   .brandStack .brand{ font-size:12px; letter-spacing:.18em; color:#666; }
-
-  /* 啟動遮罩（iOS/Android 必須先點一下） */
-  #unlock{
-    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-    background:rgba(255,255,255,.85); backdrop-filter:saturate(1.2) blur(2px);
-    font-weight:700; color:#333; letter-spacing:.2em; text-align:center;
-    z-index:50; cursor:pointer; user-select:none;
-  }
-  #unlock .btn{
-    background:#111; color:#fff; padding:14px 18px; border-radius:10px;
-    box-shadow:0 8px 20px rgba(0,0,0,.18);
-  }
 </style>
 </head>
 
 <body>
   <div id="fitBox">
     <div class="unit" id="unit">
-      <div class="screen">
-        <div class="badge">DYNAMIC</div>
-      </div>
+      <div class="screen"><div class="badge">DYNAMIC</div></div>
 
-      <div id="unlock"><div class="btn">點一下開始</div></div>
-
-      <div class="chip" id="muteBtn">M</div>
-      <div class="chip s" id="startBtn">S</div>
+      <div class="chip" id="muteBtn" title="Mute">M</div>
+      <div class="chip s" id="startBtn" title="Start/Stop">S</div>
 
       <div class="knob left"  id="waveKnob" data-label="SINE"></div>
       <div class="knob center" id="freqKnob" data-label="1 kHz"></div>
@@ -138,7 +122,7 @@
   </div>
 
 <script>
-/* ===== 等比縮放：以 720×720 畫布為基準 ===== */
+/* ===== 等比縮放 ===== */
 (function(){
   function fit(){
     const box  = document.getElementById('fitBox');
@@ -165,46 +149,41 @@
   });
 })();
 
-/* ===== Web Audio：懶啟動（首觸發才建立） ===== */
+/* ===== Web Audio：僅在用戶手勢時 resume ===== */
 const Audio = {
   ctx:null, osc:null, gain:null, running:false, muted:false,
   ensure(){
     if(this.ctx) return;
     const AC = window.AudioContext || window.webkitAudioContext;
     this.ctx = new AC();
-    // iOS unlock 小招：建立零長度 buffer 播一次
-    const b = this.ctx.createBuffer(1,1,this.ctx.sampleRate);
-    const s = this.ctx.createBufferSource(); s.buffer=b; s.connect(this.ctx.destination); s.start(0);
-
     this.gain = this.ctx.createGain(); this.gain.gain.value = dbToLin(-6);
-    this.osc  = this.ctx.createOscillator();
-    this.osc.type = 'sine'; this.osc.frequency.value = 1000;
-    this.osc.connect(this.gain).connect(this.ctx.destination);
-    // 不立即 start，等使用者按 S
+    this.gain.connect(this.ctx.destination);
+  },
+  async resume(){
+    this.ensure();
+    if(this.ctx.state !== 'running'){
+      try{ await this.ctx.resume(); }catch(e){}
+    }
   },
   start(){
-    this.ensure();
-    if(!this.running){
-      // 有些瀏覽器需要每次新建 oscillator
-      this.osc = this.ctx.createOscillator();
-      this.osc.type = state.wave;
-      this.osc.frequency.value = state.freq;
-      this.osc.connect(this.gain);
-      this.gain.connect(this.ctx.destination);
-      this.osc.start();
-      this.running = true;
-    }
+    if(this.running) return;
+    // 每次新建 oscillator，避免 stop 後無法再 start 的相容性問題
+    this.osc = this.ctx.createOscillator();
+    this.osc.type = state.wave;
+    this.osc.frequency.value = state.freq;
+    this.osc.connect(this.gain);
+    this.osc.start();
+    this.running = true;
   },
   stop(){
-    if(this.running && this.osc){
-      try{ this.osc.stop(); }catch(e){}
-      this.osc.disconnect();
-      this.running = false;
-    }
+    if(!this.running) return;
+    try{ this.osc.stop(); }catch(e){}
+    try{ this.osc.disconnect(); }catch(e){}
+    this.running = false;
   },
   setFreq(v){ if(this.osc) this.osc.frequency.value = v; },
   setWave(t){ if(this.osc) this.osc.type = t; },
-  setGainDb(db){ if(this.gain) this.gain.gain.value = dbToLin(db); },
+  setGainDb(db){ if(this.gain && !this.muted) this.gain.gain.value = dbToLin(db); },
   mute(on){
     this.muted = on;
     if(this.gain){
@@ -215,11 +194,7 @@ const Audio = {
 function dbToLin(db){ return Math.pow(10, db/20); }
 
 /* ===== 參數狀態 ===== */
-const state = {
-  wave:'sine',   // 'sine' | 'square' | 'sawtooth' | 'triangle'
-  freq:1000,     // Hz
-  db:-6          // dBFS（約 -60 ~ 0）
-};
+const state = { wave:'sine', freq:1000, db:-6 };
 
 /* ===== 旋鈕互動 ===== */
 (function(){
@@ -232,9 +207,13 @@ const state = {
     function setDeg(deg){ dial.style.transform = `rotate(${deg}deg)`; dial._deg = deg; }
 
     function onDown(e){
+      // 嘗試先恢復 AudioContext（任何手勢都觸發）
+      Audio.resume();
       const r=dial.getBoundingClientRect();
-      dragging = { cx:r.left+r.width/2, cy:r.top+r.height/2, start:(dial._deg||0) };
-      base = dragging.start - toDeg(dragging.cx,dragging.cy, (e.touches?e.touches[0].clientX:e.clientX), (e.touches?e.touches[0].clientY:e.clientY) );
+      dragging = { cx:r.left+r.width/2, cy:r.top+r.height/2 };
+      base = (dial._deg||0) - toDeg(dragging.cx,dragging.cy,
+              (e.touches?e.touches[0].clientX:e.clientX),
+              (e.touches?e.touches[0].clientY:e.clientY));
       e.preventDefault();
     }
     function onMove(e){
@@ -281,7 +260,7 @@ const state = {
     const db = Math.round( -60 + t*60 ); // -60 ~ 0
     state.db = db;
     document.querySelector('#volKnob .readout').textContent = `VOL ${db} dB`;
-    if(!Audio.muted) Audio.setGainDb(db);
+    Audio.setGainDb(db);
   }, -10);
 })();
 
@@ -295,25 +274,23 @@ function formatHz(f){
 }
 
 /* ===== Mute / Start・Stop ===== */
-document.getElementById('muteBtn').addEventListener('click', ()=>{
+document.getElementById('muteBtn').addEventListener('click', async ()=>{
+  await Audio.resume();
   Audio.mute(!Audio.muted);
   document.getElementById('muteBtn').style.opacity = Audio.muted? .55 : 1;
 });
 document.getElementById('startBtn').addEventListener('click', async ()=>{
-  Audio.ensure();
-  if(Audio.ctx.state !== 'running') await Audio.ctx.resume();
+  await Audio.resume();
   if(Audio.running){ Audio.stop(); }
   else{ Audio.start(); }
   document.getElementById('startBtn').style.opacity = Audio.running? 1 : .55;
 });
 
-/* ===== 首次點擊解鎖 WebAudio ===== */
-document.getElementById('unlock').addEventListener('click', async ()=>{
-  Audio.ensure();
-  try{ await Audio.ctx.resume(); }catch(e){}
-  document.getElementById('unlock').style.display='none';
-  // 啟動預設聲音（按需）
-  Audio.start();
+/* ===== 頁面返回可見時自動恢復（避免手機切出去後沒聲音） ===== */
+document.addEventListener('visibilitychange', async ()=>{
+  if(document.visibilityState === 'visible' && Audio.running){
+    await Audio.resume();
+  }
 });
 
 /* 初始 readout 與按鈕狀態 */
