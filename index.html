@@ -10,23 +10,22 @@
 <style>
   :root { --panel:#f2f2f2; --screen:#111; }
 
-  /* 全頁置中背景 */
   html,body{
     margin:0; height:100%;
     background:linear-gradient(180deg,#ececec,#f8f8f8);
     font-family: Inter, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, "Noto Sans TC", sans-serif;
     -webkit-text-size-adjust: 100%;
+    overscroll-behavior:none;
   }
   body{ display:grid; place-items:center; }
 
-  /* ====== 等比縮放容器（關鍵修正） ====== */
+  /* ====== 等比縮放容器（關鍵） ====== */
   #fitBox{
     width:min(92vw, 760px);
     height:min(92vw, 760px);
     position:relative;
-    overflow:hidden; /* 避免陰影外溢 */
+    overflow:hidden;
   }
-  /* 固定 720×720 畫布，用 scale 等比縮放；絕對置中避免偏移 */
   #fitBox > .unit{
     width:720px; height:720px;
     position:absolute; left:50%; top:50%;
@@ -34,7 +33,7 @@
     transform-origin:center center;
   }
 
-  /* 你的裝置面板 */
+  /* 面板 */
   .unit{
     background:var(--panel);
     border-radius:28px;
@@ -43,7 +42,7 @@
       0 14px 40px rgba(0,0,0,.12);
   }
 
-  /* 螢幕區 */
+  /* 顯示器 */
   .screen{
     position:absolute; left:24px; right:24px; top:24px; height:34%;
     background:var(--screen);
@@ -56,10 +55,21 @@
     font-size:12px; color:#bfe2ff;
     background:#1b1b1b; border:1px solid #333; border-radius:999px;
     padding:6px 10px; letter-spacing:.1em;
+    user-select:none;
   }
 
+  /* M / S 鈕 */
+  .chip{ position:absolute; width:44px; height:44px; border-radius:50%;
+    left: calc(50% - 170px); top:calc(34% + 52px);
+    background:radial-gradient(circle at 35% 35%, #fff,#e5e5e5);
+    display:grid; place-items:center; color:#444; font-weight:700;
+    box-shadow:0 1px 2px rgba(0,0,0,.2), inset 0 4px 8px rgba(0,0,0,.15);
+    user-select:none;
+  }
+  .chip.s{ left:auto; right: calc(50% - 170px); }
+
   /* 旋鈕 */
-  .knob{ --size:120px; position:absolute; width:var(--size); height:var(--size); }
+  .knob{ --size:120px; position:absolute; width:var(--size); height:var(--size); user-select:none; }
   .knob .dial{
     width:100%; height:100%; border-radius:50%;
     background:radial-gradient(circle at 36% 36%, #fff, #d7d7d7);
@@ -82,15 +92,7 @@
   .knob.left  { --size:120px; left:150px; bottom:86px; }
   .knob.right { --size:120px; right:150px; bottom:86px; }
 
-  /* M / S 鈕（樣式） */
-  .chip{ position:absolute; width:44px; height:44px; border-radius:50%;
-    left: calc(50% - 170px); top:calc(34% + 52px);
-    background:radial-gradient(circle at 35% 35%, #fff,#e5e5e5);
-    display:grid; place-items:center; color:#444; font-weight:700; box-shadow:0 1px 2px rgba(0,0,0,.2), inset 0 4px 8px rgba(0,0,0,.15);
-  }
-  .chip.s{ left:auto; right: calc(50% - 170px); }
-
-  /* 品牌區（置底） */
+  /* 品牌區 */
   .brandStack{
     position:absolute; left:50%; bottom:14px; transform:translateX(-50%);
     display:flex; flex-direction:column; align-items:center; gap:6px; color:#333;
@@ -98,39 +100,45 @@
   .brandStack .name{ font-weight:700; letter-spacing:.20em; font-size:16px; }
   .brandStack .brand{ font-size:12px; letter-spacing:.18em; color:#666; }
 
-  /* 防被手勢捲動/縮放影響 */
-  html, body{ overscroll-behavior:none; }
+  /* 啟動遮罩（iOS/Android 必須先點一下） */
+  #unlock{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.85); backdrop-filter:saturate(1.2) blur(2px);
+    font-weight:700; color:#333; letter-spacing:.2em; text-align:center;
+    z-index:50; cursor:pointer; user-select:none;
+  }
+  #unlock .btn{
+    background:#111; color:#fff; padding:14px 18px; border-radius:10px;
+    box-shadow:0 8px 20px rgba(0,0,0,.18);
+  }
 </style>
 </head>
 
 <body>
-  <!-- 等比縮放外框 -->
   <div id="fitBox">
-    <!-- 固定 720×720 畫布（內容可照你的樣式排） -->
     <div class="unit" id="unit">
-
       <div class="screen">
         <div class="badge">DYNAMIC</div>
-        <!-- 若你有 canvas，照原本插入就好 -->
       </div>
 
-      <div class="chip">M</div>
-      <div class="chip s">S</div>
+      <div id="unlock"><div class="btn">點一下開始</div></div>
 
-      <div class="knob left"  data-label="SINE"></div>
-      <div class="knob center" data-label="1 kHz"></div>
-      <div class="knob right" data-label="VOL -6.0 dB"></div>
+      <div class="chip" id="muteBtn">M</div>
+      <div class="chip s" id="startBtn">S</div>
+
+      <div class="knob left"  id="waveKnob" data-label="SINE"></div>
+      <div class="knob center" id="freqKnob" data-label="1 kHz"></div>
+      <div class="knob right" id="volKnob"  data-label="VOL -6.0 dB"></div>
 
       <div class="brandStack">
         <div class="name">THE GENERATOR</div>
         <div class="brand">Designed by YO</div>
       </div>
-
     </div>
   </div>
 
 <script>
-/* === 等比縮放：以 720×720 畫布為基準 === */
+/* ===== 等比縮放：以 720×720 畫布為基準 ===== */
 (function(){
   function fit(){
     const box  = document.getElementById('fitBox');
@@ -144,9 +152,8 @@
   window.addEventListener('orientationchange', fit, {passive:true});
 })();
 
-/* === 旋鈕：簡易可拖轉示範（保留你的外觀） === */
+/* ===== 旋鈕外觀建立 ===== */
 (function(){
-  // 建構 knob 外觀
   document.querySelectorAll('.knob').forEach(k=>{
     const dial = document.createElement('div'); dial.className='dial';
     const cap  = document.createElement('div'); cap.className='cap';
@@ -156,48 +163,166 @@
     dial.appendChild(cap); dial.appendChild(tick);
     k.appendChild(dial); k.appendChild(ro);
   });
+})();
 
-  // 簡單拖曳轉角
-  let dragging=null, base=0;
-  const toDeg = (cx,cy,x,y)=>Math.atan2(y-cy,x-cx)*180/Math.PI + 90;
-  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+/* ===== Web Audio：懶啟動（首觸發才建立） ===== */
+const Audio = {
+  ctx:null, osc:null, gain:null, running:false, muted:false,
+  ensure(){
+    if(this.ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    this.ctx = new AC();
+    // iOS unlock 小招：建立零長度 buffer 播一次
+    const b = this.ctx.createBuffer(1,1,this.ctx.sampleRate);
+    const s = this.ctx.createBufferSource(); s.buffer=b; s.connect(this.ctx.destination); s.start(0);
 
-  function onDown(e){
-    const d=e.currentTarget, r=d.getBoundingClientRect();
-    dragging = { d,
-      cx:r.left+r.width/2, cy:r.top+r.height/2,
-      start: (d._deg||0)
-    };
-    base = dragging.start - toDeg(dragging.cx,dragging.cy, (e.touches?e.touches[0].clientX:e.clientX), (e.touches?e.touches[0].clientY:e.clientY) );
-    e.preventDefault();
+    this.gain = this.ctx.createGain(); this.gain.gain.value = dbToLin(-6);
+    this.osc  = this.ctx.createOscillator();
+    this.osc.type = 'sine'; this.osc.frequency.value = 1000;
+    this.osc.connect(this.gain).connect(this.ctx.destination);
+    // 不立即 start，等使用者按 S
+  },
+  start(){
+    this.ensure();
+    if(!this.running){
+      // 有些瀏覽器需要每次新建 oscillator
+      this.osc = this.ctx.createOscillator();
+      this.osc.type = state.wave;
+      this.osc.frequency.value = state.freq;
+      this.osc.connect(this.gain);
+      this.gain.connect(this.ctx.destination);
+      this.osc.start();
+      this.running = true;
+    }
+  },
+  stop(){
+    if(this.running && this.osc){
+      try{ this.osc.stop(); }catch(e){}
+      this.osc.disconnect();
+      this.running = false;
+    }
+  },
+  setFreq(v){ if(this.osc) this.osc.frequency.value = v; },
+  setWave(t){ if(this.osc) this.osc.type = t; },
+  setGainDb(db){ if(this.gain) this.gain.gain.value = dbToLin(db); },
+  mute(on){
+    this.muted = on;
+    if(this.gain){
+      this.gain.gain.value = on ? 0 : dbToLin(state.db);
+    }
   }
-  function onMove(e){
-    if(!dragging) return;
-    const x=(e.touches?e.touches[0].clientX:e.clientX);
-    const y=(e.touches?e.touches[0].clientY:e.clientY);
-    let deg = base + toDeg(dragging.cx,dragging.cy,x,y);
-    deg = clamp(deg, -135, 135); // 270° 行程
-    dragging.d.style.transform = `rotate(${deg}deg)`;
-    dragging.d._deg = deg;
-  }
-  function onUp(){ dragging=null; }
+};
+function dbToLin(db){ return Math.pow(10, db/20); }
 
-  document.querySelectorAll('.dial').forEach(d=>{
-    d.addEventListener('pointerdown', onDown, {passive:false});
-    d.addEventListener('touchstart',  onDown, {passive:false});
-  });
-  window.addEventListener('pointermove', onMove, {passive:false});
-  window.addEventListener('touchmove',  onMove, {passive:false});
-  window.addEventListener('pointerup',  onUp,   {passive:true});
-  window.addEventListener('touchend',   onUp,   {passive:true});
+/* ===== 參數狀態 ===== */
+const state = {
+  wave:'sine',   // 'sine' | 'square' | 'sawtooth' | 'triangle'
+  freq:1000,     // Hz
+  db:-6          // dBFS（約 -60 ~ 0）
+};
+
+/* ===== 旋鈕互動 ===== */
+(function(){
+  function setupKnob(k, onChange, initialDeg){
+    const dial = k.querySelector('.dial');
+    let dragging=null, base=0;
+
+    const toDeg = (cx,cy,x,y)=>Math.atan2(y-cy,x-cx)*180/Math.PI + 90;
+    const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+    function setDeg(deg){ dial.style.transform = `rotate(${deg}deg)`; dial._deg = deg; }
+
+    function onDown(e){
+      const r=dial.getBoundingClientRect();
+      dragging = { cx:r.left+r.width/2, cy:r.top+r.height/2, start:(dial._deg||0) };
+      base = dragging.start - toDeg(dragging.cx,dragging.cy, (e.touches?e.touches[0].clientX:e.clientX), (e.touches?e.touches[0].clientY:e.clientY) );
+      e.preventDefault();
+    }
+    function onMove(e){
+      if(!dragging) return;
+      const x=(e.touches?e.touches[0].clientX:e.clientX);
+      const y=(e.touches?e.touches[0].clientY:e.clientY);
+      let deg = base + toDeg(dragging.cx,dragging.cy,x,y);
+      deg = clamp(deg, -135, 135);
+      setDeg(deg);
+      onChange( (deg+135)/270 ); // 0~1
+    }
+    function onUp(){ dragging=null; }
+
+    dial.addEventListener('pointerdown', onDown, {passive:false});
+    dial.addEventListener('touchstart',  onDown, {passive:false});
+    window.addEventListener('pointermove', onMove, {passive:false});
+    window.addEventListener('touchmove',  onMove, {passive:false});
+    window.addEventListener('pointerup',  onUp,   {passive:true});
+    window.addEventListener('touchend',   onUp,   {passive:true});
+
+    setDeg(initialDeg ?? 0);
+  }
+
+  // 左：波形（四段）
+  const waveLabels = ['SINE','SQUARE','TRI','SAW'];
+  setupKnob(document.getElementById('waveKnob'), (t)=>{
+    const idx = Math.min(3, Math.max(0, Math.round(t*3)));
+    const types = ['sine','square','triangle','sawtooth'];
+    state.wave = types[idx];
+    document.querySelector('#waveKnob .readout').textContent = waveLabels[idx];
+    Audio.setWave(state.wave);
+  }, -120);
+
+  // 中：頻率（20Hz~16kHz，對數）
+  setupKnob(document.getElementById('freqKnob'), (t)=>{
+    const f = lerpLog(20, 16000, t);
+    state.freq = Math.round(f);
+    document.querySelector('#freqKnob .readout').textContent = formatHz(state.freq);
+    Audio.setFreq(state.freq);
+  }, 10);
+
+  // 右：音量（-60dB~0dB）
+  setupKnob(document.getElementById('volKnob'), (t)=>{
+    const db = Math.round( -60 + t*60 ); // -60 ~ 0
+    state.db = db;
+    document.querySelector('#volKnob .readout').textContent = `VOL ${db} dB`;
+    if(!Audio.muted) Audio.setGainDb(db);
+  }, -10);
+})();
+
+function lerpLog(min,max,t){
+  const a = Math.log(min), b = Math.log(max);
+  return Math.exp(a + (b-a)*t);
+}
+function formatHz(f){
+  if(f>=1000) return (f/1000).toFixed(f%1000?1:0)+' kHz';
+  return f+' Hz';
+}
+
+/* ===== Mute / Start・Stop ===== */
+document.getElementById('muteBtn').addEventListener('click', ()=>{
+  Audio.mute(!Audio.muted);
+  document.getElementById('muteBtn').style.opacity = Audio.muted? .55 : 1;
+});
+document.getElementById('startBtn').addEventListener('click', async ()=>{
+  Audio.ensure();
+  if(Audio.ctx.state !== 'running') await Audio.ctx.resume();
+  if(Audio.running){ Audio.stop(); }
+  else{ Audio.start(); }
+  document.getElementById('startBtn').style.opacity = Audio.running? 1 : .55;
+});
+
+/* ===== 首次點擊解鎖 WebAudio ===== */
+document.getElementById('unlock').addEventListener('click', async ()=>{
+  Audio.ensure();
+  try{ await Audio.ctx.resume(); }catch(e){}
+  document.getElementById('unlock').style.display='none';
+  // 啟動預設聲音（按需）
+  Audio.start();
+});
+
+/* 初始 readout 與按鈕狀態 */
+(function initLabels(){
+  document.querySelector('#waveKnob .readout').textContent = 'SINE';
+  document.querySelector('#freqKnob .readout').textContent = '1 kHz';
+  document.querySelector('#volKnob  .readout').textContent = 'VOL -6.0 dB';
+  document.getElementById('startBtn').style.opacity = .55;
 })();
 </script>
-
-<!-- 你原本的功能邏輯可加在這裡
-<script>
-  // TODO: your original logic ...
-</script>
--->
-
 </body>
 </html>
