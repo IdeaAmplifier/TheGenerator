@@ -1,74 +1,62 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <title>THE GENERATOR</title>
-
-  <!-- PWA -->
-  <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#ffffff">
-  <link rel="icon" sizes="192x192" href="./pwa-icons/icon-192.png">
-  <link rel="apple-touch-icon" href="./pwa-icons/icon-192.png">
+
+  <!-- PWA（若你有 manifest / sw，可保留） -->
+  <link rel="manifest" href="./manifest.webmanifest">
 
   <style>
-    /* Reset & layout */
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
     html, body {
       margin: 0;
-      padding: 0;
       height: 100%;
-      background: #f2f2f2;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "PingFang TC",
-                   "Hiragino Sans", "Microsoft JhengHei", Helvetica, Arial, sans-serif;
+      background: #f3f3f5;
+      /* 防止下拉回彈與位移 */
+      overscroll-behavior: none;
     }
-    .app-frame {
-      position: fixed;
-      inset: 0;
-      border: 0;
-      width: 100%;
-      height: 100%;
-      display: block;
-      background: #111; /* app 進場前的底色（跟示波器一致） */
-    }
-    /* 簡單的載入畫面（避免白屏） */
-    .splash {
-      position: fixed;
-      inset: 0;
+    .wrap {
+      min-height: 100%;
       display: grid;
       place-items: center;
-      background: linear-gradient(180deg,#eaeaea,#f8f8f8);
-      color: #333;
-      letter-spacing: .12em;
-      font-size: 14px;
+      padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
     }
-    .splash.hide { display: none; }
+    /* 讓 iframe 自適應，並避免地址列收起/展開引起的跳動 */
+    .app-frame {
+      width: min(92vw, 760px);
+      aspect-ratio: 1 / 1; /* 你的 UI 是方形 */
+      border: 0;
+      border-radius: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.12);
+      background: #fff;
+      display: block;
+    }
   </style>
 </head>
 <body>
-  <!-- 載入時的簡單遮罩 -->
-  <div id="splash" class="splash">Loading THE GENERATOR…</div>
+  <div class="wrap">
+    <iframe
+      id="app"
+      class="app-frame"
+      src="./thegenerator_final.html"
+      title="THE GENERATOR"
+      allow="autoplay; fullscreen"
+      referrerpolicy="no-referrer"
+    ></iframe>
+  </div>
 
-  <!-- 你的完整 App 直接以 iframe 全螢幕載入 -->
-  <iframe
-    id="app"
-    class="app-frame"
-    src="./thegenerator_final.html"
-    title="THE GENERATOR"
-  ></iframe>
-
-  <!-- Service Worker 註冊（相對路徑 & 相對 scope，適用 GitHub Pages 子路徑） -->
   <script>
-    // 移除載入遮罩
-    const appFrame = document.getElementById('app');
-    const splash = document.getElementById('splash');
-    appFrame.addEventListener('load', () => splash.classList.add('hide'));
-
-    // 註冊 SW（放在 load 後較穩）
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(console.error);
-      });
+    // 首次使用者手勢 → 通知子頁解鎖 AudioContext
+    function sendUnlock(){
+      const f = document.getElementById('app');
+      try { f.contentWindow.postMessage({ type: 'UNLOCK_AUDIO' }, '*'); } catch(e){}
     }
+    window.addEventListener('pointerdown', sendUnlock, { once:true, passive:true });
+    window.addEventListener('touchstart', sendUnlock, { once:true, passive:true });
   </script>
 </body>
 </html>
