@@ -1,120 +1,203 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>THE GENERATOR</title>
+<meta charset="utf-8" />
+<meta name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>THE GENERATOR</title>
+<meta name="theme-color" content="#ffffff">
 
-  <!-- PWA -->
-  <link rel="manifest" href="./manifest.webmanifest">
-  <meta name="theme-color" content="#ffffff" />
-  <link rel="icon" href="./pwa-icons/icon-192.png" sizes="192x192">
-  <link rel="apple-touch-icon" href="./pwa-icons/icon-192.png">
+<style>
+  :root { --panel:#f2f2f2; --screen:#111; }
 
-  <!-- 基本樣式：把 720×720 的 UI 等比縮在方形框裡 -->
-  <style>
-    :root { color-scheme: light dark; }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; background: #f4f4f4; }
-    body { display: grid; place-items: center; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif; }
+  /* 全頁置中背景 */
+  html,body{
+    margin:0; height:100%;
+    background:linear-gradient(180deg,#ececec,#f8f8f8);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, "Noto Sans TC", sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  body{ display:grid; place-items:center; }
 
-    /* 外框：自適應螢幕但維持正方形 */
-    #fitBox {
-      width: min(92vw, 760px);
-      aspect-ratio: 1 / 1;
-      display: grid;
-      place-items: center;
-      border-radius: 28px;
-      background: #f2f2f2;
-      box-shadow:
-        inset 0 10px 30px rgba(0,0,0,.08),
-        0 16px 40px rgba(0,0,0,.14);
-      overflow: hidden; /* 防止縮放溢出 */
-    }
+  /* ====== 等比縮放容器（關鍵修正） ====== */
+  #fitBox{
+    width:min(92vw, 760px);
+    height:min(92vw, 760px);
+    position:relative;
+    overflow:hidden; /* 避免陰影外溢 */
+  }
+  /* 固定 720×720 畫布，用 scale 等比縮放；絕對置中避免偏移 */
+  #fitBox > .unit{
+    width:720px; height:720px;
+    position:absolute; left:50%; top:50%;
+    transform:translate(-50%,-50%) scale(1);
+    transform-origin:center center;
+  }
 
-    /* 內層就是你原本的 720×720 介面（以 iframe 放入） */
-    #ui {
-      width: 720px;     /* 固定基準尺寸 */
-      height: 720px;
-      border: 0;
-      transform-origin: center center; /* 讓 scale 以中心縮放 */
-      will-change: transform;
-      background: transparent;
-      /* 在 iOS 上避免雙指縮放導致抖動 */
-      touch-action: none;
-    }
+  /* 你的裝置面板 */
+  .unit{
+    background:var(--panel);
+    border-radius:28px;
+    box-shadow:
+      inset 0 10px 30px rgba(0,0,0,.12),
+      0 14px 40px rgba(0,0,0,.12);
+  }
 
-    /* 頁面頂部安裝提示（可選） */
-    #installBanner {
-      position: fixed; inset: 12px auto auto 12px;
-      display: none; align-items: center; gap: 8px;
-      padding: 8px 10px; border-radius: 12px;
-      background: #111; color: #fff; font-size: 13px;
-      box-shadow: 0 6px 20px rgba(0,0,0,.25);
-    }
-    #installBanner button{
-      appearance: none; border: 0; border-radius: 10px;
-      padding: 6px 10px; font-size: 12px; cursor: pointer;
-      background: #fff; color: #111;
-    }
-  </style>
+  /* 螢幕區 */
+  .screen{
+    position:absolute; left:24px; right:24px; top:24px; height:34%;
+    background:var(--screen);
+    border-radius:20px;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.05), inset 0 0 40px rgba(0,0,0,.6);
+    overflow:hidden;
+  }
+  .badge{
+    position:absolute; left:20px; top:14px;
+    font-size:12px; color:#bfe2ff;
+    background:#1b1b1b; border:1px solid #333; border-radius:999px;
+    padding:6px 10px; letter-spacing:.1em;
+  }
+
+  /* 旋鈕 */
+  .knob{ --size:120px; position:absolute; width:var(--size); height:var(--size); }
+  .knob .dial{
+    width:100%; height:100%; border-radius:50%;
+    background:radial-gradient(circle at 36% 36%, #fff, #d7d7d7);
+    box-shadow: 0 3px 12px rgba(0,0,0,.25), inset 0 8px 16px rgba(0,0,0,.18);
+    position:relative; cursor:grab; touch-action:none;
+  }
+  .knob .cap{
+    position:absolute; inset:14px; border-radius:50%;
+    background:radial-gradient(circle at 36% 36%, #fff, #cfcfcf);
+    box-shadow: inset 0 2px 8px rgba(0,0,0,.25);
+  }
+  .knob .tick{
+    position:absolute; top:8px; left:50%; width:3px; height:14px;
+    background:#101010; border-radius:2px; transform:translateX(-50%);
+  }
+  .readout{ text-align:center; margin-top:10px; color:#555; font-weight:600; font-size:14px; letter-spacing:.08em; }
+
+  /* 位置 */
+  .knob.center{ --size:210px; left:50%; top:55%; transform:translate(-50%,-50%); }
+  .knob.left  { --size:120px; left:150px; bottom:86px; }
+  .knob.right { --size:120px; right:150px; bottom:86px; }
+
+  /* M / S 鈕（樣式） */
+  .chip{ position:absolute; width:44px; height:44px; border-radius:50%;
+    left: calc(50% - 170px); top:calc(34% + 52px);
+    background:radial-gradient(circle at 35% 35%, #fff,#e5e5e5);
+    display:grid; place-items:center; color:#444; font-weight:700; box-shadow:0 1px 2px rgba(0,0,0,.2), inset 0 4px 8px rgba(0,0,0,.15);
+  }
+  .chip.s{ left:auto; right: calc(50% - 170px); }
+
+  /* 品牌區（置底） */
+  .brandStack{
+    position:absolute; left:50%; bottom:14px; transform:translateX(-50%);
+    display:flex; flex-direction:column; align-items:center; gap:6px; color:#333;
+  }
+  .brandStack .name{ font-weight:700; letter-spacing:.20em; font-size:16px; }
+  .brandStack .brand{ font-size:12px; letter-spacing:.18em; color:#666; }
+
+  /* 防被手勢捲動/縮放影響 */
+  html, body{ overscroll-behavior:none; }
+</style>
 </head>
 
 <body>
-  <div id="installBanner">
-    可安裝為 App
-    <button id="installBtn">安裝</button>
-  </div>
-
-  <!-- 方形容器 + 你的成品頁（thegenerator_final.html） -->
+  <!-- 等比縮放外框 -->
   <div id="fitBox">
-    <iframe id="ui" title="THE GENERATOR UI" src="./thegenerator_final.html" allow="autoplay"></iframe>
+    <!-- 固定 720×720 畫布（內容可照你的樣式排） -->
+    <div class="unit" id="unit">
+
+      <div class="screen">
+        <div class="badge">DYNAMIC</div>
+        <!-- 若你有 canvas，照原本插入就好 -->
+      </div>
+
+      <div class="chip">M</div>
+      <div class="chip s">S</div>
+
+      <div class="knob left"  data-label="SINE"></div>
+      <div class="knob center" data-label="1 kHz"></div>
+      <div class="knob right" data-label="VOL -6.0 dB"></div>
+
+      <div class="brandStack">
+        <div class="name">THE GENERATOR</div>
+        <div class="brand">Designed by YO</div>
+      </div>
+
+    </div>
   </div>
 
-  <script>
-    // === 1) 等比縮放 720×720 介面 ===
-    function fit() {
-      var box  = document.getElementById('fitBox');
-      var ui   = document.getElementById('ui');
-      if (!box || !ui) return;
-      var s = box.clientWidth / 720;           // 以寬度計算比例
-      ui.style.transform = 'scale(' + s + ')'; // 等比縮放
-    }
-    window.addEventListener('load', fit);
-    window.addEventListener('resize', fit);
-    window.addEventListener('orientationchange', fit);
+<script>
+/* === 等比縮放：以 720×720 畫布為基準 === */
+(function(){
+  function fit(){
+    const box  = document.getElementById('fitBox');
+    const unit = document.getElementById('unit');
+    if(!box || !unit) return;
+    const s = Math.min(box.clientWidth, box.clientHeight) / 720;
+    unit.style.transform = 'translate(-50%,-50%) scale('+s+')';
+  }
+  window.addEventListener('load', fit, {passive:true});
+  window.addEventListener('resize', fit, {passive:true});
+  window.addEventListener('orientationchange', fit, {passive:true});
+})();
 
-    // === 2) 行動瀏覽器 AudioContext 喚醒：點一下外層就通知內頁 ===
-    function unlockAudio() {
-      var ui = document.getElementById('ui');
-      if (ui && ui.contentWindow) {
-        ui.contentWindow.postMessage({ type: 'UNLOCK_AUDIO' }, '*');
-      }
-    }
-    window.addEventListener('pointerdown', unlockAudio, { passive: true });
-    window.addEventListener('touchstart',  unlockAudio, { passive: true });
+/* === 旋鈕：簡易可拖轉示範（保留你的外觀） === */
+(function(){
+  // 建構 knob 外觀
+  document.querySelectorAll('.knob').forEach(k=>{
+    const dial = document.createElement('div'); dial.className='dial';
+    const cap  = document.createElement('div'); cap.className='cap';
+    const tick = document.createElement('div'); tick.className='tick';
+    const ro   = document.createElement('div'); ro.className='readout';
+    ro.textContent = k.dataset.label || '';
+    dial.appendChild(cap); dial.appendChild(tick);
+    k.appendChild(dial); k.appendChild(ro);
+  });
 
-    // === 3) PWA：安裝提示（可選） ===
-    let deferredPrompt = null;
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      const banner = document.getElementById('installBanner');
-      banner.style.display = 'flex';
-    });
-    document.getElementById('installBtn')?.addEventListener('click', async () => {
-      if (!deferredPrompt) return;
-      await deferredPrompt.prompt();
-      deferredPrompt = null;
-      document.getElementById('installBanner').style.display = 'none';
-    });
+  // 簡單拖曳轉角
+  let dragging=null, base=0;
+  const toDeg = (cx,cy,x,y)=>Math.atan2(y-cy,x-cx)*180/Math.PI + 90;
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-    // === 4) 註冊 Service Worker ===
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(console.error);
-      });
-    }
-  </script>
+  function onDown(e){
+    const d=e.currentTarget, r=d.getBoundingClientRect();
+    dragging = { d,
+      cx:r.left+r.width/2, cy:r.top+r.height/2,
+      start: (d._deg||0)
+    };
+    base = dragging.start - toDeg(dragging.cx,dragging.cy, (e.touches?e.touches[0].clientX:e.clientX), (e.touches?e.touches[0].clientY:e.clientY) );
+    e.preventDefault();
+  }
+  function onMove(e){
+    if(!dragging) return;
+    const x=(e.touches?e.touches[0].clientX:e.clientX);
+    const y=(e.touches?e.touches[0].clientY:e.clientY);
+    let deg = base + toDeg(dragging.cx,dragging.cy,x,y);
+    deg = clamp(deg, -135, 135); // 270° 行程
+    dragging.d.style.transform = `rotate(${deg}deg)`;
+    dragging.d._deg = deg;
+  }
+  function onUp(){ dragging=null; }
+
+  document.querySelectorAll('.dial').forEach(d=>{
+    d.addEventListener('pointerdown', onDown, {passive:false});
+    d.addEventListener('touchstart',  onDown, {passive:false});
+  });
+  window.addEventListener('pointermove', onMove, {passive:false});
+  window.addEventListener('touchmove',  onMove, {passive:false});
+  window.addEventListener('pointerup',  onUp,   {passive:true});
+  window.addEventListener('touchend',   onUp,   {passive:true});
+})();
+</script>
+
+<!-- 你原本的功能邏輯可加在這裡
+<script>
+  // TODO: your original logic ...
+</script>
+-->
+
 </body>
 </html>
