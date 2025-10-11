@@ -1,26 +1,46 @@
-// Simple cache-first service worker
-const CACHE = "the-generator-cache-v1";
-const ASSETS = [
-  "./",
-  "./index.html",
-  "./manifest.webmanifest",
-  "./favicon.png",
+/* sw.js — very small offline-first cache */
+const CACHE_NAME = 'the-generator-v1';
+const APP_SHELL = [
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './thegenerator_final.html',
+  './pwa-icons/icon-192.png',
+  './pwa-icons/icon-512.png'
 ];
 
-self.addEventListener("install", (event) => {
+// 安裝：預先快取
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
   );
+  self.skipWaiting();
 });
 
-self.addEventListener("activate", (event) => {
+// 啟用：清舊版快取
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.map(k => k !== CACHE && caches.delete(k))))
+    caches.keys().then(keys =>
+      Promise.all(keys.map(k => (k === CACHE_NAME ? null : caches.delete(k))))
+    )
   );
+  self.clients.claim();
 });
 
-self.addEventListener("fetch", (event) => {
+// 取用：Cache, then Network fallback，離線再給 index.html
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    caches.match(req).then((cached) => {
+      if (cached) return cached;
+      return fetch(req).then((resp) => {
+        // 只快取 GET 且成功的回應
+        if (req.method === 'GET' && resp && resp.status === 200 && resp.type === 'basic') {
+          const clone = resp.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(req, clone));
+        }
+        return resp;
+      }).catch(() => caches.match('./index.html'));
+    })
   );
 });
